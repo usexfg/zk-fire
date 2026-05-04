@@ -204,4 +204,50 @@ mod tests {
         assert_eq!(parsed.len(), 1);
         assert_eq!(parsed[0], commitment);
     }
+
+    #[test]
+    fn parse_heat_commitments_empty() {
+        let parsed = parse_heat_commitments(&[]);
+        assert_eq!(parsed.len(), 0);
+    }
+
+    #[test]
+    fn parse_heat_commitments_unknown_tag() {
+        let extra = vec![0x99, 0x01, 0x02];
+        let parsed = parse_heat_commitments(&extra);
+        assert_eq!(parsed.len(), 0);
+    }
+
+    #[test]
+    fn parse_heat_commitments_truncated() {
+        let mut extra = vec![TX_EXTRA_HEAT_TAG];
+        extra.extend_from_slice(&[0xAAu8; 31]); // only 31 bytes after tag
+        let parsed = parse_heat_commitments(&extra);
+        assert_eq!(parsed.len(), 0);
+    }
+
+    #[test]
+    fn parse_heat_commitments_multiple() {
+        let c1 = [0xAAu8; 32];
+        let c2 = [0xBBu8; 32];
+        let mut extra = vec![TX_EXTRA_HEAT_TAG];
+        extra.extend_from_slice(&c1);
+        extra.push(TX_EXTRA_HEAT_TAG);
+        extra.extend_from_slice(&c2);
+        let parsed = parse_heat_commitments(&extra);
+        assert_eq!(parsed.len(), 2);
+        assert_eq!(parsed[0], c1);
+        assert_eq!(parsed[1], c2);
+    }
+
+    #[test]
+    fn parse_heat_commitments_mixed() {
+        let c1 = [0xAAu8; 32];
+        let mut extra = vec![TX_EXTRA_HEAT_TAG];
+        extra.extend_from_slice(&c1);
+        extra.push(0x99); // unknown tag
+        let parsed = parse_heat_commitments(&extra);
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0], c1);
+    }
 }

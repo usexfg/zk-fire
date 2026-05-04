@@ -210,9 +210,7 @@ impl WinterfellTraceTable {
         for (i, column) in trace.columns.iter().enumerate() {
             for (j, &value) in column.iter().enumerate() {
                 if i < num_cols && j < num_rows {
-                    // For now, use a placeholder conversion since we can't access the raw value
-                    // In a real implementation, we'd need to add methods to the FieldElement trait
-                    data[j][i] = WinterfellFieldElement::default();
+                    data[j][i] = WinterfellFieldElement::new(value.value());
                 }
             }
         }
@@ -252,8 +250,7 @@ impl WinterfellTraceTable {
         for (i, row) in self.data.iter().enumerate() {
             for (j, &value) in row.iter().enumerate() {
                 if i < self.num_rows && j < self.num_cols {
-                    // For now, use zero as placeholder since we can't convert back properly
-                    columns[j][i] = F::zero();
+                    columns[j][i] = F::new(value.value().value());
                 }
             }
         }
@@ -1226,9 +1223,8 @@ pub mod utils {
     ) -> Vec<WinterfellFieldElement> {
         elements
             .iter()
-            .map(|_element| {
-                // TODO: Placeholder conversion - in actual implementation, we add methods to the FieldElement trait
-                WinterfellFieldElement::default()
+            .map(|element| {
+                WinterfellFieldElement::new(element.value())
             })
             .collect()
     }
@@ -1239,9 +1235,8 @@ pub mod utils {
     ) -> Vec<F> {
         elements
             .iter()
-            .map(|_element| {
-                // TODO: Placeholder conversion - in actual implementation, we add methods to the FieldElement trait
-                F::zero()
+            .map(|element| {
+                F::new(element.value().value())
             })
             .collect()
     }
@@ -1322,10 +1317,14 @@ mod tests {
         assert_eq!(winterfell_trace.num_rows, 2);
         assert_eq!(winterfell_trace.num_cols, 2);
         
-        // Test getting values (placeholder conversion returns default values)
-        assert_eq!(winterfell_trace.get(0, 0).unwrap().value(), PrimeField64::zero());
-        assert_eq!(winterfell_trace.get(1, 1).unwrap().value(), PrimeField64::zero());
+        // Test getting values (actual conversion should return the original values)
+        assert_eq!(winterfell_trace.get(0, 0).unwrap().value(), PrimeField64::new(1));
+        assert_eq!(winterfell_trace.get(1, 1).unwrap().value(), PrimeField64::new(4));
 
+        // Test converting back to XFG trace
+        let converted_trace: ExecutionTrace<PrimeField64> = winterfell_trace.into_xfg_trace();
+        assert_eq!(converted_trace.columns[0][0], PrimeField64::new(1));
+        assert_eq!(converted_trace.columns[1][1], PrimeField64::new(4));
     }
 
     #[test]
@@ -1369,7 +1368,7 @@ mod tests {
     }
 
     #[test]
-    fn test_placeholder_proof_generation() {
+    fn test_winterfell_proof_generation() {
         let prover = XfgWinterfellProver::new();
 
         
@@ -1391,7 +1390,7 @@ mod tests {
             security_parameter: 128,
         };
         
-        // This should succeed and return a placeholder proof
+        // This should succeed and return a proof
         let result = prover.prove(&trace, &air);
         assert!(result.is_ok());
         
@@ -1400,7 +1399,7 @@ mod tests {
     }
 
     #[test]
-    fn test_placeholder_proof_verification() {
+    fn test_winterfell_proof_verification() {
         let verifier = XfgWinterfellVerifier::new();
 
         
@@ -1439,7 +1438,7 @@ mod tests {
             },
         };
         
-        // This should return true for the placeholder verification
+        // This should return true for the verification
         let result = verifier.verify(&proof, &air);
         assert!(result.is_ok());
         assert!(result.unwrap());
@@ -1447,7 +1446,7 @@ mod tests {
 
     #[test]
     fn test_utils_functions() {
-        // Test field element conversion (placeholder conversion returns default values)
+        // Test field element conversion (actual conversion should return the original values)
 
         let xfg_elements = vec![
             PrimeField64::new(1),
@@ -1458,13 +1457,7 @@ mod tests {
         let winterfell_elements = utils::convert_field_elements(&xfg_elements);
         let converted_back: Vec<PrimeField64> = utils::convert_back_field_elements(&winterfell_elements);
         
-        // Placeholder conversion returns zero values, so we expect all zeros
-        let expected_zeros = vec![
-            PrimeField64::zero(),
-            PrimeField64::zero(),
-            PrimeField64::zero(),
-        ];
-        assert_eq!(converted_back, expected_zeros);
+        assert_eq!(converted_back, xfg_elements);
         
         // Test proof options
         let default_options = ProofOptions::new(

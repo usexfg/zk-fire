@@ -1,9 +1,8 @@
-name: Release XFG STARK CLI
-
+name: Release XFG STARK Prover
 on:
   push:
     tags:
-      - 'v*'
+      - 'xfg-v*'
   workflow_dispatch:
 
 jobs:
@@ -14,14 +13,14 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
         include:
           - os: ubuntu-latest
-            artifact_name: xfg-stark-cli-linux
-            binary_name: xfg-stark-cli
+            artifact_name: xfg-stark-linux
+            xfg_binary: xfg-stark-cli
           - os: macos-latest
-            artifact_name: xfg-stark-cli-macos
-            binary_name: xfg-stark-cli
+            artifact_name: xfg-stark-macos
+            xfg_binary: xfg-stark-cli
           - os: windows-latest
-            artifact_name: xfg-stark-cli-windows
-            binary_name: xfg-stark-cli.exe
+            artifact_name: xfg-stark-windows
+            xfg_binary: xfg-stark-cli.exe
 
     steps:
     - name: Checkout code
@@ -39,26 +38,26 @@ jobs:
         path: |
           ~/.cargo/registry
           ~/.cargo/git
-          target
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          xfg-stark/target
+        key: ${{ runner.os }}-cargo-xfg-${{ hashFiles('xfg-stark/Cargo.lock') }}
         restore-keys: |
-          ${{ runner.os }}-cargo-
+          ${{ runner.os }}-cargo-xfg-
 
-    - name: Build STARK CLI
+    - name: Build XFG STARK CLI
       run: |
+        cd xfg-stark
         cargo build --bin xfg-stark-cli --release
-        ls -la target/release/
       shell: bash
 
     - name: Create distribution package
       run: |
         mkdir -p dist
-        cp target/release/${{ matrix.binary_name }} dist/
-        cp scripts/auto_stark_proof.sh dist/ 2>/dev/null || echo "Script not found"
-        cp scripts/stark_proof_generator.py dist/ 2>/dev/null || echo "Script not found"
-        cp scripts/progress_logger.py dist/ 2>/dev/null || echo "Script not found"
-        cp STARK_INTEGRATION_GUIDE.md dist/ 2>/dev/null || echo "Guide not found"
-        cp STARK_CLI_INTEGRATION_GUIDE.md dist/ 2>/dev/null || echo "Guide not found"
+        cp xfg-stark/target/release/${{ matrix.xfg_binary }} dist/
+        cp xfg-stark/scripts/auto_stark_proof.sh dist/ 2>/dev/null || echo "Script not found"
+        cp xfg-stark/scripts/stark_proof_generator.py dist/ 2>/dev/null || echo "Script not found"
+        cp xfg-stark/scripts/progress_logger.py dist/ 2>/dev/null || echo "Script not found"
+        cp xfg-stark/STARK_INTEGRATION_GUIDE.md dist/ 2>/dev/null || echo "Guide not found"
+        cp xfg-stark/STARK_CLI_INTEGRATION_GUIDE.md dist/ 2>/dev/null || echo "Guide not found"
         
         # Create README for distribution
         echo "# XFG STARK CLI Distribution" > dist/README.md
@@ -86,14 +85,14 @@ jobs:
         chmod +x dist/*.py 2>/dev/null || true
         
         # Create archive
-        tar -czf ${{ matrix.artifact_name }}.tar.gz -C dist .
+        cd dist
+        tar -czf ../${{ matrix.artifact_name }}.tar.gz .
         if [ "$RUNNER_OS" = "Windows" ]; then
-          powershell Compress-Archive -Path dist\* -DestinationPath ${{ matrix.artifact_name }}.zip
+          powershell Compress-Archive -Path * -DestinationPath ../${{ matrix.artifact_name }}.zip
         else
-          zip -r ${{ matrix.artifact_name }}.zip dist/
+          zip -r ../${{ matrix.artifact_name }}.zip .
         fi
-        
-        ls -la *.tar.gz *.zip
+        cd ..
       shell: bash
 
     - name: Upload artifacts

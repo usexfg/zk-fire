@@ -6,6 +6,7 @@
 use std::fmt::{Display, Formatter};
 use std::marker::PhantomData;
 use serde::{Serialize, Deserialize};
+use bincode;
 use crate::types::{FieldElement, StarkComponent, TypeError};
 use crate::Result;
 
@@ -38,7 +39,7 @@ pub enum StarkError {
 }
 
 /// STARK proof structure
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StarkProof<F: FieldElement> {
     /// Execution trace
     pub trace: ExecutionTrace<F>,
@@ -113,14 +114,14 @@ impl<F: FieldElement> StarkProof<F> {
             version: 1,
             security_parameter: 128,
             field_modulus: "0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47".to_string(),
-            proof_size: 1024, // TODO: Calculate real proof size
+            proof_size: 0, // Placeholder, will be updated below
             timestamp: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
                 .as_secs(),
         };
 
-        Self {
+        let mut proof = Self {
             trace: dummy_trace,
             air: dummy_air,
             commitments: vec![], // TODO: Generate real commitments
@@ -130,7 +131,11 @@ impl<F: FieldElement> StarkProof<F> {
                 final_polynomial: vec![], // TODO: Generate real final polynomial
             },
             metadata: dummy_metadata,
-        }
+        };
+
+        // Calculate real proof size
+        proof.metadata.proof_size = proof.to_bytes().len();
+        proof
     }
 
     /// TODO: Replace with real proof initialization - this is temporary for testing only
@@ -165,7 +170,7 @@ impl<F: FieldElement> StarkProof<F> {
             timestamp: 0,
         };
 
-        Self {
+        let mut proof = Self {
             trace: empty_trace,
             air: empty_air,
             commitments: vec![],
@@ -175,12 +180,16 @@ impl<F: FieldElement> StarkProof<F> {
                 final_polynomial: vec![], // TODO: Generate real final polynomial
             },
             metadata: empty_metadata,
-        }
+        };
+
+        // Calculate real proof size
+        proof.metadata.proof_size = proof.to_bytes().len();
+        proof
     }
 }
 
 /// Execution trace for STARK proof
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExecutionTrace<F: FieldElement> {
     /// Trace columns
     pub columns: Vec<Vec<F>>,
@@ -197,7 +206,7 @@ impl<F: FieldElement> Display for ExecutionTrace<F> {
 }
 
 /// AIR (Algebraic Intermediate Representation) constraints
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Air<F: FieldElement> {
     /// Constraint polynomials
     pub constraints: Vec<Constraint<F>>,
@@ -216,7 +225,7 @@ impl<F: FieldElement> Display for Air<F> {
 }
 
 /// Constraint in AIR
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Constraint<F: FieldElement> {
     /// Constraint polynomial
     pub polynomial: Vec<F>,
@@ -244,7 +253,7 @@ pub enum ConstraintType {
 }
 
 /// Transition function
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TransitionFunction<F: FieldElement> {
     /// Function coefficients
     pub coefficients: Vec<Vec<F>>,
@@ -259,7 +268,7 @@ impl<F: FieldElement> Display for TransitionFunction<F> {
 }
 
 /// Boundary conditions
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BoundaryConditions<F: FieldElement> {
     /// Boundary constraints
     pub constraints: Vec<BoundaryConstraint<F>>,
@@ -272,7 +281,7 @@ impl<F: FieldElement> Display for BoundaryConditions<F> {
 }
 
 /// Boundary constraint
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BoundaryConstraint<F: FieldElement> {
     /// Register index
     pub register: usize,
@@ -289,7 +298,7 @@ impl<F: FieldElement> Display for BoundaryConstraint<F> {
 }
 
 /// Merkle tree commitment
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MerkleCommitment<F: FieldElement> {
     /// Root hash
     pub root: Vec<u8>,
@@ -306,7 +315,7 @@ impl<F: FieldElement> Display for MerkleCommitment<F> {
 }
 
 /// FRI proof components
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FriProof<F: FieldElement> {
     /// FRI layers
     pub layers: Vec<FriLayer<F>>,
@@ -323,7 +332,7 @@ impl<F: FieldElement> Display for FriProof<F> {
 }
 
 /// FRI layer
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FriLayer<F: FieldElement> {
     /// Layer polynomial
     pub polynomial: Vec<F>,
@@ -340,7 +349,7 @@ impl<F: FieldElement> Display for FriLayer<F> {
 }
 
 /// FRI query
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FriQuery<F: FieldElement> {
     /// Query point
     pub point: F,
@@ -376,7 +385,7 @@ impl Display for ProofMetadata {
     }
 }
 
-impl<F: FieldElement> StarkComponent<F> for StarkProof<F> {
+impl<F: FieldElement + Serialize + for<'de> Deserialize<'de>> StarkComponent<F> for StarkProof<F> {
     fn validate(&self) -> std::result::Result<(), TypeError> {
         // Validate trace
         self.trace.validate()?;
@@ -396,17 +405,18 @@ impl<F: FieldElement> StarkComponent<F> for StarkProof<F> {
     }
     
     fn to_bytes(&self) -> Vec<u8> {
-        // Placeholder implementation
-        Vec::new()
+        match bincode::serialize(self) {
+            Ok(bytes) => bytes,
+            Err(_) => Vec::new(),
+        }
     }
     
-    fn from_bytes(_bytes: &[u8]) -> std::result::Result<Self, TypeError> {
-        // Placeholder implementation
-        Err(TypeError::InvalidConversion("Not implemented".to_string()))
+    fn from_bytes(bytes: &[u8]) -> std::result::Result<Self, TypeError> {
+        bincode::deserialize(bytes).map_err(|e| TypeError::InvalidConversion(e.to_string()))
     }
 }
 
-impl<F: FieldElement> StarkComponent<F> for ExecutionTrace<F> {
+impl<F: FieldElement + Serialize + for<'de> Deserialize<'de>> StarkComponent<F> for ExecutionTrace<F> {
     fn validate(&self) -> std::result::Result<(), TypeError> {
         if self.length == 0 {
             return Err(TypeError::InvalidConversion("Empty trace".to_string()));
@@ -430,17 +440,15 @@ impl<F: FieldElement> StarkComponent<F> for ExecutionTrace<F> {
     }
     
     fn to_bytes(&self) -> Vec<u8> {
-        // Placeholder implementation
-        Vec::new()
+        match bincode::serialize(self) { Ok(bytes) => bytes, Err(_) => Vec::new() }
     }
     
-    fn from_bytes(_bytes: &[u8]) -> std::result::Result<Self, TypeError> {
-        // Placeholder implementation
-        Err(TypeError::InvalidConversion("Not implemented".to_string()))
+    fn from_bytes(bytes: &[u8]) -> std::result::Result<Self, TypeError> {
+        bincode::deserialize(bytes).map_err(|e| TypeError::InvalidConversion(e.to_string()))
     }
 }
 
-impl<F: FieldElement> StarkComponent<F> for Air<F> {
+impl<F: FieldElement + Serialize + for<'de> Deserialize<'de>> StarkComponent<F> for Air<F> {
     fn validate(&self) -> std::result::Result<(), TypeError> {
         // Validate constraints
         for constraint in &self.constraints {
@@ -457,17 +465,15 @@ impl<F: FieldElement> StarkComponent<F> for Air<F> {
     }
     
     fn to_bytes(&self) -> Vec<u8> {
-        // Placeholder implementation
-        Vec::new()
+        match bincode::serialize(self) { Ok(bytes) => bytes, Err(_) => Vec::new() }
     }
     
-    fn from_bytes(_bytes: &[u8]) -> std::result::Result<Self, TypeError> {
-        // Placeholder implementation
-        Err(TypeError::InvalidConversion("Not implemented".to_string()))
+    fn from_bytes(bytes: &[u8]) -> std::result::Result<Self, TypeError> {
+        bincode::deserialize(bytes).map_err(|e| TypeError::InvalidConversion(e.to_string()))
     }
 }
 
-impl<F: FieldElement> StarkComponent<F> for TransitionFunction<F> {
+impl<F: FieldElement + Serialize + for<'de> Deserialize<'de>> StarkComponent<F> for TransitionFunction<F> {
     fn validate(&self) -> std::result::Result<(), TypeError> {
         if self.coefficients.is_empty() {
             return Err(TypeError::InvalidConversion("Empty coefficients".to_string()));
@@ -476,17 +482,15 @@ impl<F: FieldElement> StarkComponent<F> for TransitionFunction<F> {
     }
     
     fn to_bytes(&self) -> Vec<u8> {
-        // Placeholder implementation
-        Vec::new()
+        match bincode::serialize(self) { Ok(bytes) => bytes, Err(_) => Vec::new() }
     }
     
-    fn from_bytes(_bytes: &[u8]) -> std::result::Result<Self, TypeError> {
-        // Placeholder implementation
-        Err(TypeError::InvalidConversion("Not implemented".to_string()))
+    fn from_bytes(bytes: &[u8]) -> std::result::Result<Self, TypeError> {
+        bincode::deserialize(bytes).map_err(|e| TypeError::InvalidConversion(e.to_string()))
     }
 }
 
-impl<F: FieldElement> StarkComponent<F> for BoundaryConditions<F> {
+impl<F: FieldElement + Serialize + for<'de> Deserialize<'de>> StarkComponent<F> for BoundaryConditions<F> {
     fn validate(&self) -> std::result::Result<(), TypeError> {
         for constraint in &self.constraints {
             constraint.validate()?;
@@ -495,33 +499,29 @@ impl<F: FieldElement> StarkComponent<F> for BoundaryConditions<F> {
     }
     
     fn to_bytes(&self) -> Vec<u8> {
-        // Placeholder implementation
-        Vec::new()
+        match bincode::serialize(self) { Ok(bytes) => bytes, Err(_) => Vec::new() }
     }
     
-    fn from_bytes(_bytes: &[u8]) -> std::result::Result<Self, TypeError> {
-        // Placeholder implementation
-        Err(TypeError::InvalidConversion("Not implemented".to_string()))
+    fn from_bytes(bytes: &[u8]) -> std::result::Result<Self, TypeError> {
+        bincode::deserialize(bytes).map_err(|e| TypeError::InvalidConversion(e.to_string()))
     }
 }
 
-impl<F: FieldElement> StarkComponent<F> for BoundaryConstraint<F> {
+impl<F: FieldElement + Serialize + for<'de> Deserialize<'de>> StarkComponent<F> for BoundaryConstraint<F> {
     fn validate(&self) -> std::result::Result<(), TypeError> {
         Ok(())
     }
     
     fn to_bytes(&self) -> Vec<u8> {
-        // Placeholder implementation
-        Vec::new()
+        match bincode::serialize(self) { Ok(bytes) => bytes, Err(_) => Vec::new() }
     }
     
-    fn from_bytes(_bytes: &[u8]) -> std::result::Result<Self, TypeError> {
-        // Placeholder implementation
-        Err(TypeError::InvalidConversion("Not implemented".to_string()))
+    fn from_bytes(bytes: &[u8]) -> std::result::Result<Self, TypeError> {
+        bincode::deserialize(bytes).map_err(|e| TypeError::InvalidConversion(e.to_string()))
     }
 }
 
-impl<F: FieldElement> StarkComponent<F> for MerkleCommitment<F> {
+impl<F: FieldElement + Serialize + for<'de> Deserialize<'de>> StarkComponent<F> for MerkleCommitment<F> {
     fn validate(&self) -> std::result::Result<(), TypeError> {
         if self.root.is_empty() {
             return Err(TypeError::InvalidConversion("Empty root".to_string()));
@@ -535,17 +535,15 @@ impl<F: FieldElement> StarkComponent<F> for MerkleCommitment<F> {
     }
     
     fn to_bytes(&self) -> Vec<u8> {
-        // Placeholder implementation
-        Vec::new()
+        match bincode::serialize(self) { Ok(bytes) => bytes, Err(_) => Vec::new() }
     }
     
-    fn from_bytes(_bytes: &[u8]) -> std::result::Result<Self, TypeError> {
-        // Placeholder implementation
-        Err(TypeError::InvalidConversion("Not implemented".to_string()))
+    fn from_bytes(bytes: &[u8]) -> std::result::Result<Self, TypeError> {
+        bincode::deserialize(bytes).map_err(|e| TypeError::InvalidConversion(e.to_string()))
     }
 }
 
-impl<F: FieldElement> StarkComponent<F> for FriProof<F> {
+impl<F: FieldElement + Serialize + for<'de> Deserialize<'de>> StarkComponent<F> for FriProof<F> {
     fn validate(&self) -> std::result::Result<(), TypeError> {
         if self.layers.is_empty() {
             return Err(TypeError::InvalidConversion("Empty layers".to_string()));
@@ -567,17 +565,15 @@ impl<F: FieldElement> StarkComponent<F> for FriProof<F> {
     }
     
     fn to_bytes(&self) -> Vec<u8> {
-        // Placeholder implementation
-        Vec::new()
+        match bincode::serialize(self) { Ok(bytes) => bytes, Err(_) => Vec::new() }
     }
     
-    fn from_bytes(_bytes: &[u8]) -> std::result::Result<Self, TypeError> {
-        // Placeholder implementation
-        Err(TypeError::InvalidConversion("Not implemented".to_string()))
+    fn from_bytes(bytes: &[u8]) -> std::result::Result<Self, TypeError> {
+        bincode::deserialize(bytes).map_err(|e| TypeError::InvalidConversion(e.to_string()))
     }
 }
 
-impl<F: FieldElement> StarkComponent<F> for FriLayer<F> {
+impl<F: FieldElement + Serialize + for<'de> Deserialize<'de>> StarkComponent<F> for FriLayer<F> {
     fn validate(&self) -> std::result::Result<(), TypeError> {
         if self.polynomial.is_empty() {
             return Err(TypeError::InvalidConversion("Empty polynomial".to_string()));
@@ -591,17 +587,15 @@ impl<F: FieldElement> StarkComponent<F> for FriLayer<F> {
     }
     
     fn to_bytes(&self) -> Vec<u8> {
-        // Placeholder implementation
-        Vec::new()
+        match bincode::serialize(self) { Ok(bytes) => bytes, Err(_) => Vec::new() }
     }
     
-    fn from_bytes(_bytes: &[u8]) -> std::result::Result<Self, TypeError> {
-        // Placeholder implementation
-        Err(TypeError::InvalidConversion("Not implemented".to_string()))
+    fn from_bytes(bytes: &[u8]) -> std::result::Result<Self, TypeError> {
+        bincode::deserialize(bytes).map_err(|e| TypeError::InvalidConversion(e.to_string()))
     }
 }
 
-impl<F: FieldElement> StarkComponent<F> for FriQuery<F> {
+impl<F: FieldElement + Serialize + for<'de> Deserialize<'de>> StarkComponent<F> for FriQuery<F> {
     fn validate(&self) -> std::result::Result<(), TypeError> {
         if self.responses.is_empty() {
             return Err(TypeError::InvalidConversion("Empty responses".to_string()));
@@ -610,13 +604,11 @@ impl<F: FieldElement> StarkComponent<F> for FriQuery<F> {
     }
     
     fn to_bytes(&self) -> Vec<u8> {
-        // Placeholder implementation
-        Vec::new()
+        match bincode::serialize(self) { Ok(bytes) => bytes, Err(_) => Vec::new() }
     }
     
-    fn from_bytes(_bytes: &[u8]) -> std::result::Result<Self, TypeError> {
-        // Placeholder implementation
-        Err(TypeError::InvalidConversion("Not implemented".to_string()))
+    fn from_bytes(bytes: &[u8]) -> std::result::Result<Self, TypeError> {
+        bincode::deserialize(bytes).map_err(|e| TypeError::InvalidConversion(e.to_string()))
     }
 }
 
@@ -667,5 +659,21 @@ mod tests {
         // This is expected for placeholder implementation
         let validation_result = proof.validate();
         assert!(validation_result.is_err() || validation_result.is_ok());
+    }
+
+    #[test]
+    fn test_dummy_proof_size() {
+        let proof = StarkProof::<PrimeField64>::new_dummy();
+        let bytes = proof.to_bytes();
+        assert_eq!(proof.metadata.proof_size, bytes.len());
+        assert!(proof.metadata.proof_size > 0);
+    }
+
+    #[test]
+    fn test_empty_proof_size() {
+        let proof = StarkProof::<PrimeField64>::new_empty();
+        let bytes = proof.to_bytes();
+        assert_eq!(proof.metadata.proof_size, bytes.len());
+        assert!(proof.metadata.proof_size > 0);
     }
 }

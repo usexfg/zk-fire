@@ -14,3 +14,4 @@ hex = "0.4"
 tiny-keccak = { version = "2", features = ["keccak"] }
 fuego-prover-core = { path = "../fuego-prover-core" }
 chrono = "0.4"
+tempfile = "3"

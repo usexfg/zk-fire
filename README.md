@@ -1,6 +1,6 @@
-# Fuego HEAT Claim Tools
+# Fuego zk Tools
 
-Interactive TUI and CLI tools for claiming HEAT tokens using STARK + Merkle proof bundles.
+Interactive TUI and CLI tools for using XFG-STARK + Merkle proof bundles.
 
 ## Quick Start
 

@@ -350,13 +350,23 @@ fn generate_bundle(app: &mut App) -> Result<()> {
         }
     });
     
-    let package_file = "/tmp/fuego_package.json";
-    std::fs::write(package_file, serde_json::to_string_pretty(&package_data)?)?;
+    let mut package_file = tempfile::NamedTempFile::new()?;
+    serde_json::to_writer_pretty(&mut package_file, &package_data)?;
+    package_file.flush()?;
+    let package_path = package_file.path();
     
-    let proof_file = "/tmp/fuego_proof.json";
+    let proof_file = tempfile::NamedTempFile::new()?;
+    let proof_path = proof_file.path();
     
     let stark_output = Command::new("cargo")
-        .args(["run", "-p", "xfg-stark-cli", "--", "generate", package_file, &app.recipient, proof_file])
+        .args([
+            "run",
+            "-p", "xfg-stark-cli",
+            "--", "generate",
+        ])
+        .arg(package_path)
+        .arg(&app.recipient)
+        .arg(proof_path)
         .current_dir(std::env::current_dir()?)
         .output()?;
     
@@ -374,9 +384,20 @@ fn generate_bundle(app: &mut App) -> Result<()> {
     preimage.extend_from_slice(&0xFFFFFFFFu32.to_le_bytes());
     let preimage_hex = hex::encode(&preimage);
     
-    let merkle_file = "/tmp/fuego_merkle.json";
+    let merkle_file = tempfile::NamedTempFile::new()?;
+    let merkle_path = merkle_file.path();
     let merkle_output = Command::new("cargo")
-        .args(["run", "-p", "fuego-prover-cli", "--", "claim", "--rpc", &app.rpc, "--commitment", "0x", "--preimage", &preimage_hex, "--recipient", &app.recipient, "--out", merkle_file])
+        .args([
+            "run",
+            "-p", "fuego-prover-cli",
+            "--", "claim",
+            "--rpc", &app.rpc,
+            "--commitment", "0x",
+            "--preimage", &preimage_hex,
+            "--recipient", &app.recipient,
+            "--out",
+        ])
+        .arg(merkle_path)
         .current_dir(std::env::current_dir()?)
         .output()?;
     
@@ -384,8 +405,8 @@ fn generate_bundle(app: &mut App) -> Result<()> {
         bail!("Merkle proof generation failed: {}", String::from_utf8_lossy(&merkle_output.stderr));
     }
     
-    let merkle_data: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(merkle_file)?)?;
-    let stark_data: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(proof_file)?)?;
+    let merkle_data: serde_json::Value = serde_json::from_reader(std::fs::File::open(merkle_path)?)?;
+    let stark_data: serde_json::Value = serde_json::from_reader(std::fs::File::open(proof_path)?)?;
     
     let commitment = compute_commitment(&app.secret, amount, 1, 42161, 3, 0xFFFFFFFF)?;
     let nullifier = compute_nullifier(&app.secret, amount)?;
@@ -409,10 +430,6 @@ fn generate_bundle(app: &mut App) -> Result<()> {
     
     app.bundle_path = Some(output_path);
     app.status_messages.push("Bundle generated successfully!".to_string());
-    
-    std::fs::remove_file(package_file).ok();
-    std::fs::remove_file(proof_file).ok();
-    std::fs::remove_file(merkle_file).ok();
     
     Ok(())
 }
